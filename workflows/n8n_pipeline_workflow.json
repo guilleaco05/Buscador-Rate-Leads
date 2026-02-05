@@ -1,0 +1,305 @@
+{
+    "name": "Lead Generator - Automated Pipeline (Docker Integrado)",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "weeks",
+                            "weekdaysType": "weekDays",
+                            "triggerAtDay": [
+                                1
+                            ],
+                            "triggerAtHour": 9,
+                            "triggerAtMinute": 0
+                        }
+                    ]
+                }
+            },
+            "name": "Schedule Trigger",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ],
+            "id": "schedule-node"
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "query-var",
+                            "name": "query",
+                            "value": "abogados en Madrid",
+                            "type": "string"
+                        },
+                        {
+                            "id": "limit-var",
+                            "name": "limit",
+                            "value": 20,
+                            "type": "number"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "name": "Set Variables",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3,
+            "position": [
+                450,
+                300
+            ],
+            "id": "set-vars-node",
+            "notes": "✏️ Edita 'query' y 'limit' aquí antes de ejecutar manualmente"
+        },
+        {
+            "parameters": {
+                "command": "=cd /data/scripts && bash run_pipeline.sh \"{{ $json.query }}\" {{ $json.limit }}",
+                "options": {}
+            },
+            "name": "Execute Pipeline",
+            "type": "n8n-nodes-base.executeCommand",
+            "typeVersion": 1,
+            "position": [
+                650,
+                300
+            ],
+            "id": "execute-pipeline-node",
+            "notes": "Ejecuta el pipeline completo dentro del contenedor"
+        },
+        {
+            "parameters": {
+                "command": "ls -t /data/scripts/.tmp/sheets_import_*.csv 2>/dev/null | head -n1 || echo 'NO_FILE'"
+            },
+            "name": "Get Latest CSV Path",
+            "type": "n8n-nodes-base.executeCommand",
+            "typeVersion": 1,
+            "position": [
+                850,
+                300
+            ],
+            "id": "get-csv-path-node"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "string": [
+                        {
+                            "value1": "={{ $json.stdout }}",
+                            "operation": "notContains",
+                            "value2": "NO_FILE"
+                        }
+                    ]
+                }
+            },
+            "name": "Check CSV Exists",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                1050,
+                300
+            ],
+            "id": "check-csv-node"
+        },
+        {
+            "parameters": {
+                "command": "=cat {{ $json.stdout.trim() }}"
+            },
+            "name": "Read CSV Content",
+            "type": "n8n-nodes-base.executeCommand",
+            "typeVersion": 1,
+            "position": [
+                1250,
+                200
+            ],
+            "id": "read-csv-node"
+        },
+        {
+            "parameters": {
+                "mode": "jsonToString",
+                "options": {
+                    "fileName": "leads.csv"
+                }
+            },
+            "name": "Parse CSV",
+            "type": "n8n-nodes-base.convertToFile",
+            "typeVersion": 1,
+            "position": [
+                1450,
+                200
+            ],
+            "id": "parse-csv-node"
+        },
+        {
+            "parameters": {
+                "operation": "append",
+                "documentId": {
+                    "__rl": true,
+                    "value": "YOUR_GOOGLE_SHEET_ID_HERE",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "Leads",
+                    "mode": "name"
+                },
+                "columns": {
+                    "mappingMode": "autoMapInputData"
+                },
+                "options": {}
+            },
+            "name": "Append to Google Sheets",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [
+                1650,
+                200
+            ],
+            "id": "sheets-append-node",
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "1",
+                    "name": "Google Sheets Account"
+                }
+            },
+            "notes": "⚠️ Actualiza YOUR_GOOGLE_SHEET_ID_HERE con tu ID real"
+        },
+        {
+            "parameters": {
+                "message": "=✅ Pipeline completado!\n\nQuery: {{ $('Set Variables').item.json.query }}\nResultados: {{ $json.itemCount || 'N/A' }}\nArchivo: {{ $('Get Latest CSV Path').item.json.stdout }}"
+            },
+            "name": "Success Notification",
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                1850,
+                200
+            ],
+            "id": "success-node",
+            "notes": "Aquí puedes añadir Email/Telegram/Slack"
+        },
+        {
+            "parameters": {
+                "message": "=❌ Error: No se generó archivo CSV\n\nQuery: {{ $('Set Variables').item.json.query }}\n\nRevisa los logs del contenedor:\ndocker logs n8n-lead-generator"
+            },
+            "name": "Error - No CSV",
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                1250,
+                400
+            ],
+            "id": "error-no-csv-node"
+        }
+    ],
+    "connections": {
+        "Schedule Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Set Variables",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Set Variables": {
+            "main": [
+                [
+                    {
+                        "node": "Execute Pipeline",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Execute Pipeline": {
+            "main": [
+                [
+                    {
+                        "node": "Get Latest CSV Path",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get Latest CSV Path": {
+            "main": [
+                [
+                    {
+                        "node": "Check CSV Exists",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check CSV Exists": {
+            "main": [
+                [
+                    {
+                        "node": "Read CSV Content",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Error - No CSV",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Read CSV Content": {
+            "main": [
+                [
+                    {
+                        "node": "Parse CSV",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse CSV": {
+            "main": [
+                [
+                    {
+                        "node": "Append to Google Sheets",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Append to Google Sheets": {
+            "main": [
+                [
+                    {
+                        "node": "Success Notification",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "staticData": null,
+    "tags": [],
+    "triggerCount": 1,
+    "updatedAt": "2026-02-05T12:19:00.000Z",
+    "versionId": "2"
+}

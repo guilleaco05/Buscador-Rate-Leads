@@ -1,0 +1,253 @@
+{
+    "name": "Lead Generator - Simple",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "weeks",
+                            "weekdaysType": "weekDays",
+                            "triggerAtDay": [
+                                1
+                            ],
+                            "triggerAtHour": 9,
+                            "triggerAtMinute": 0
+                        }
+                    ]
+                }
+            },
+            "name": "Schedule Trigger",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "query",
+                            "name": "query",
+                            "value": "abogados en Madrid",
+                            "type": "string"
+                        },
+                        {
+                            "id": "limit",
+                            "name": "limit",
+                            "value": 20,
+                            "type": "number"
+                        }
+                    ]
+                }
+            },
+            "name": "Set Variables",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3,
+            "position": [
+                450,
+                300
+            ],
+            "notes": "✏️ Edita query y limit aquí"
+        },
+        {
+            "parameters": {
+                "command": "cd C:\\Users\\TuUsuario\\Buscador-Rate-Leads && python execution\\scrape_gmb_api.py --query \"={{ $json.query }}\" --max-results {{ $json.limit }} --format json",
+                "options": {}
+            },
+            "name": "1. Search Google Places",
+            "type": "n8n-nodes-base.executeCommand",
+            "typeVersion": 1,
+            "position": [
+                650,
+                300
+            ],
+            "notes": "⚠️ Actualiza la ruta C:\\Users\\TuUsuario\\"
+        },
+        {
+            "parameters": {
+                "command": "cd C:\\Users\\TuUsuario\\Buscador-Rate-Leads && python execution\\deduplicate_leads.py --input .tmp\\api_leads_*.json --output .tmp\\leads_clean.json",
+                "options": {}
+            },
+            "name": "2. Deduplicate",
+            "type": "n8n-nodes-base.executeCommand",
+            "typeVersion": 1,
+            "position": [
+                850,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "command": "cd C:\\Users\\TuUsuario\\Buscador-Rate-Leads && python execution\\analyze_pain_points.py --input .tmp\\leads_clean.json --output-format json",
+                "options": {}
+            },
+            "name": "3. Analyze Pain Points",
+            "type": "n8n-nodes-base.executeCommand",
+            "typeVersion": 1,
+            "position": [
+                1050,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "command": "cd C:\\Users\\TuUsuario\\Buscador-Rate-Leads && python execution\\export_to_sheets_csv.py --input .tmp\\leads_analyzed_*.json --output .tmp\\final_export.csv",
+                "options": {}
+            },
+            "name": "4. Export to CSV",
+            "type": "n8n-nodes-base.executeCommand",
+            "typeVersion": 1,
+            "position": [
+                1250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "filePath": "=C:\\Users\\TuUsuario\\Buscador-Rate-Leads\\.tmp\\final_export.csv"
+            },
+            "name": "5. Read CSV",
+            "type": "n8n-nodes-base.readBinaryFile",
+            "typeVersion": 1,
+            "position": [
+                1450,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "mode": "autoMapInputData",
+                "options": {
+                    "fromFormat": "csv"
+                }
+            },
+            "name": "6. Parse CSV",
+            "type": "n8n-nodes-base.convertToFile",
+            "typeVersion": 1,
+            "position": [
+                1650,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "append",
+                "documentId": {
+                    "__rl": true,
+                    "value": "YOUR_GOOGLE_SHEET_ID",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "Leads",
+                    "mode": "name"
+                },
+                "columns": {
+                    "mappingMode": "autoMapInputData"
+                }
+            },
+            "name": "7. Upload to Google Sheets",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [
+                1850,
+                300
+            ],
+            "notes": "⚠️ Configura tus credenciales de Google Sheets"
+        }
+    ],
+    "connections": {
+        "Schedule Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Set Variables",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Set Variables": {
+            "main": [
+                [
+                    {
+                        "node": "1. Search Google Places",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "1. Search Google Places": {
+            "main": [
+                [
+                    {
+                        "node": "2. Deduplicate",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "2. Deduplicate": {
+            "main": [
+                [
+                    {
+                        "node": "3. Analyze Pain Points",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "3. Analyze Pain Points": {
+            "main": [
+                [
+                    {
+                        "node": "4. Export to CSV",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "4. Export to CSV": {
+            "main": [
+                [
+                    {
+                        "node": "5. Read CSV",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "5. Read CSV": {
+            "main": [
+                [
+                    {
+                        "node": "6. Parse CSV",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "6. Parse CSV": {
+            "main": [
+                [
+                    {
+                        "node": "7. Upload to Google Sheets",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

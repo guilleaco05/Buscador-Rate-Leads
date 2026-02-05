@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  n8n:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: n8n-lead-generator
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      # N8N Configuration
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=changeme123  # ⚠️ CAMBIAR ESTO
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=Europe/Madrid
+      
+      # Python Scripts - Google API Keys (desde .env)
+      - GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY}
+      - GOOGLE_CSE_API_KEY=${GOOGLE_CSE_API_KEY}
+      - GOOGLE_CSE_ID=${GOOGLE_CSE_ID}
+      
+    volumes:
+      # Persistir datos de N8N
+      - n8n_data:/home/node/.n8n
+      
+      # Montar .env para que los scripts lo lean
+      - ./.env:/data/scripts/.env:ro
+      
+      # Montar directorio temporal (para ver los CSVs generados)
+      - ./output:/data/scripts/.tmp
+      
+      # Montar credentials.json si usas Google Sheets API
+      - ./credentials.json:/data/scripts/credentials.json:ro
+    
+    networks:
+      - n8n-network
+
+volumes:
+  n8n_data:
+    driver: local
+
+networks:
+  n8n-network:
+    driver: bridge
